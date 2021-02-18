@@ -1,8 +1,9 @@
 import fetch from "node-fetch";
 import {buildRequest} from "./request";
 import {serialize} from "./util";
+import {parse as parseXML} from "fast-xml-parser";
 
-type CreateParams = {
+type BigbluebuttonCreateParams = {
     name?: string;
     meetingID: string;
     attendeePW?: string;
@@ -38,7 +39,7 @@ type CreateParams = {
     guestPolicy?: "ALWAYS_ACCEPT" | "ALWAYS_DENY" | "ASK_MODERATOR";
 };
 
-type CreateResponse = {
+type BigbluebuttonCreateResponse = {
     meetingID: string;
     internalMeetingID: string;
     parentMeetingID?: string;
@@ -47,9 +48,9 @@ type CreateResponse = {
     created: Date;
     voiceBridge?: string;
     dialNumber?: string;
-    hasUserJoined?: boolean;
+    hasUserJoined: boolean;
     duration: number;
-    hasBeenForciblyEnded?: boolean;
+    hasBeenForciblyEnded: boolean;
 };
 
 export default class BigBlueButton {
@@ -61,12 +62,30 @@ export default class BigBlueButton {
         this.secret = secret;
     }
 
-    public async createMeeting(params: CreateParams): Promise<void>/*Promise<CreateResponse>*/ {
+    public async createMeeting(params: BigbluebuttonCreateParams): Promise<BigbluebuttonCreateResponse> {
         const requestUrl: string = this.buildRequest("create", serialize({...params}));
-        console.log(requestUrl);
+        const _response = await fetch(requestUrl);
+        if(_response.status === 200) {
+            const response = parseXML(await _response.text()).response;
+            if(response.returncode && response.returncode === "SUCCESS") {
+                let returnValues: BigbluebuttonCreateResponse = {
+                    meetingID: response.meetingID,
+                    internalMeetingID: response.internalMeetingID,
+                    attendeePW: response.attendeePW,
+                    moderatorPW: response.moderatorPW,
+                    created: new Date(response.createTime),
+                    duration: response.duration,
+                    hasBeenForciblyEnded: response.hasBeenForciblyEnded,
+                    hasUserJoined: response.hasUserJoined
+                };
+                if(response.voiceBridge) returnValues.voiceBridge = response.voiceBridge;
+                if(response.dialNumber) returnValues.dialNumber = response.dialNumber;
+                return returnValues;
+            } else throw new Error(`API call failed: ${response.message}`);
+        } else throw new Error(`HTTP ${_response.status}`);
     }
 
     private buildRequest(method: string, params: string): string {
-        return buildRequest(`${this.host}/${method}`, method, params, this.secret);
+        return buildRequest(`${this.host}/api/${method}`, method, params, this.secret);
     }
 };
