@@ -51,6 +51,29 @@ type BigbluebuttonCreateResponse = {
     hasUserJoined: boolean;
     duration: number;
     hasBeenForciblyEnded: boolean;
+    createTime: number;
+};
+
+type BigbluebuttonJoinParams = {
+    fullName: string;
+    meetingID: string;
+    password: string;
+    createTime?: number;
+    userID?: string;
+    webVoiceConf?: string;
+    configToken?: string;
+    defaultLayout?: string;
+    avatarURL?: string;
+    clientURL?: string;
+    guest?: true;
+};
+
+type BigbluebuttonJoinResponse = {
+    meetingID: string;
+    userID: string;
+    authToken: string;
+    sessionToken: string;
+    url: string;
 };
 
 export default class BigBlueButton {
@@ -76,10 +99,29 @@ export default class BigBlueButton {
                     created: new Date(response.createTime),
                     duration: response.duration,
                     hasBeenForciblyEnded: response.hasBeenForciblyEnded,
-                    hasUserJoined: response.hasUserJoined
+                    hasUserJoined: response.hasUserJoined,
+                    createTime: response.createTime
                 };
                 if(response.voiceBridge) returnValues.voiceBridge = response.voiceBridge;
                 if(response.dialNumber) returnValues.dialNumber = response.dialNumber;
+                return returnValues;
+            } else throw new Error(`API call failed: ${response.message}`);
+        } else throw new Error(`HTTP ${_response.status}`);
+    }
+
+    public async joinMeeting(params: BigbluebuttonJoinParams): Promise<BigbluebuttonJoinResponse> {
+        const requestUrl: string = this.buildRequest("join", serialize({...params, redirect: "FALSE", joinViaHtml5: "true"}));
+        const _response = await fetch(requestUrl);
+        if(_response.status === 200) {
+            const response = parseXML(await _response.text()).response;
+            if(response.returncode && response.returncode === "SUCCESS") {
+                let returnValues: BigbluebuttonJoinResponse = {
+                    meetingID: response.meeting_id,
+                    userID: response.user_id,
+                    authToken: response.auth_token,
+                    sessionToken: response.session_token,
+                    url: response.url
+                };
                 return returnValues;
             } else throw new Error(`API call failed: ${response.message}`);
         } else throw new Error(`HTTP ${_response.status}`);
