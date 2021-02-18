@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import { buildRequest } from "./request";
-import { serialize } from "./util";
+import { serialize, asyncForEach } from "./util";
 import { parse as parseXML } from "fast-xml-parser";
 
 type BigbluebuttonCreateParams = {
@@ -74,6 +74,50 @@ type BigbluebuttonJoinResponse = {
 	authToken: string;
 	sessionToken: string;
 	url: string;
+};
+
+type BigbluebuttonAttendee = {
+    userID: string;
+    fullName: string;
+    role: "VIEWER" | "MODERATOR";
+    isPresenter: boolean;
+    isListeningOnly: boolean;
+    hasJoinedVoice: boolean;
+    hasVideo: boolean;
+    clientType: "HTML5" | "FLASH";
+}
+
+type BigbluebuttonMeetingInfo = {
+    meetingName: string;
+    meetingID: string;
+    internalMeetingID: string;
+    createTime: number;
+    created: Date;
+    voiceBridge?: string;
+    dialNumber?: string;
+    attendeePW: string;
+    moderatorPW: string;
+    running: boolean;
+    duration: number;
+    hasUserJoined: boolean;
+    recording: boolean;
+    hasBeenForciblyEnded: boolean;
+    startTime?: number;
+    endTime?: number;
+    participantCount: number;
+    listenerCount: number;
+    voiceParticipantCount: number;
+    videoCount: number;
+    maxUsers: number;
+    moderatorCount: number;
+    attendees: BigbluebuttonAttendee[];
+    isBreakout: boolean;
+    breakoutRooms?: number[];
+    breakout?: {
+        parentMeetingID: string;
+        sequence: number;
+        freeJoin: boolean;
+    }
 };
 
 export default class BigBlueButton {
@@ -170,6 +214,46 @@ export default class BigBlueButton {
 			} else throw new Error(`API call failed: ${response.message}`);
 		} else throw new Error(`HTTP ${_response.status}`);
 	}
+
+    public async getMeetingInfo(meetingID: string): Promise<BigbluebuttonMeetingInfo>  {
+        const requestUrl: string = this.buildRequest("getMeetingInfo", serialize({meetingID: meetingID}));
+        const _response = await fetch(requestUrl);
+        if(_response.status === 200) {
+            const response = parseXML(await _response.text()).response;
+            if(response.returncode && response.returncode === "SUCCESS") {
+                let attendees: BigbluebuttonAttendee[] = [];
+                if(response.attendees) {
+                    await asyncForEach(response.attendees, async function (attendee: BigbluebuttonAttendee) {
+                        attendees.push(attendee);
+                    });
+                }
+                let returnValues: BigbluebuttonMeetingInfo = {
+                    meetingID: response.meetingID,
+                    meetingName: response.meetingName,
+                    internalMeetingID: response.internalMeetingID,
+                    startTime: response.startTime,
+                    createTime: response.createTime,
+                    created: new Date(response.createTime),
+                    attendeePW: response.attendeePW,
+                    moderatorPW: response.moderatorPW,
+                    moderatorCount: response.moderatorCount,
+                    participantCount: response.participantCount,
+                    running: response.running,
+                    duration: response.duration,
+                    hasUserJoined: response.hasUserJoined,
+                    recording: response.recording,
+                    hasBeenForciblyEnded: response.hasBeenForciblyEnded,
+                    listenerCount: response.listenerCount,
+                    voiceParticipantCount: response.voiceParticipantCount,
+                    videoCount: response.videoCount,
+                    isBreakout: response.isBreakout,
+                    maxUsers: response.maxUsers,
+                    attendees: attendees
+                };
+                return returnValues;
+            } else throw new Error(`API call failed: ${response.message}`);
+        } else throw new Error(`HTTP ${_response.status}`);
+    }
 
 	private buildRequest(method: string, params: string): string {
 		return buildRequest(
