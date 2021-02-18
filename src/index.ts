@@ -263,6 +263,58 @@ export default class BigBlueButton {
 		} else throw new Error(`HTTP ${_response.status}`);
 	}
 
+	public async getMeetings(): Promise<BigbluebuttonMeetingInfo[]> {
+		const requestUrl = this.buildRequest("getMeetings", "");
+		const _response = await fetch(requestUrl);
+		if (_response.status === 200) {
+			const response = parseXML(await _response.text()).response;
+			if (response.returncode && response.returncode === "SUCCESS") {
+				let meetings: BigbluebuttonMeetingInfo[] = [];
+				if (
+					response.meetings.meeting &&
+					response.meetings.meeting.length >= 1
+				) {
+					await asyncForEach(
+						response.meetings.meeting,
+						async function (meeting: any) {
+							let attendees: BigbluebuttonAttendee[] = [];
+							await asyncForEach(
+								meeting.attendees,
+								async function (attendee: BigbluebuttonAttendee) {
+									attendees.push(attendee);
+								}
+							);
+							meetings.push({
+								meetingID: meeting.meetingID,
+								meetingName: meeting.meetingName,
+								internalMeetingID: meeting.internalMeetingID,
+								startTime: meeting.startTime,
+								createTime: meeting.createTime,
+								created: meeting.createTime,
+								attendeePW: meeting.attendeePW,
+								moderatorPW: meeting.moderatorPW,
+								moderatorCount: meeting.moderatorCount,
+								participantCount: meeting.participantCount,
+								running: meeting.running,
+								duration: meeting.duration,
+								hasUserJoined: meeting.hasUserJoined,
+								recording: meeting.recording,
+								hasBeenForciblyEnded: meeting.hasBeenForciblyEnded,
+								listenerCount: meeting.listenerCount,
+								voiceParticipantCount: meeting.voiceParticipantCount,
+								videoCount: meeting.videoCount,
+								isBreakout: meeting.isBreakout,
+								maxUsers: meeting.maxUsers,
+								attendees: attendees,
+							});
+						}
+					);
+					return meetings;
+				} else return meetings;
+			} else throw new Error(`API call failed: ${response.message}`);
+		} else throw new Error(`HTTP ${_response.status}`);
+	}
+
 	private buildRequest(method: string, params: string): string {
 		return buildRequest(
 			`${this.host}/api/${method}`,
