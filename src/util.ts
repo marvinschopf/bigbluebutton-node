@@ -6,3 +6,9 @@ export function serialize(obj: Object) {
 		}
 	return str.join("&");
 }
+
+export async function asyncForEach(array: any[], callback: Function) {
+	for (let index: number = 0; index < array.length; index++) {
+		await callback(array[index], index, array);
+	}
+}
