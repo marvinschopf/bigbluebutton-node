@@ -138,6 +138,22 @@ export default class BigBlueButton {
 		} else throw new Error(`HTTP ${_response.status}`);
 	}
 
+	public async isMeetingRunning(meetingID: string): Promise<boolean> {
+		const requestUrl: string = this.buildRequest(
+			"isMeetingRunning",
+			serialize({
+				meetingID: meetingID,
+			})
+		);
+		const _response = await fetch(requestUrl);
+		if (_response.status === 200) {
+			const response = parseXML(await _response.text()).response;
+			if (response.returncode && response.returncoode === "SUCCESS") {
+				return response.running;
+			} else throw new Error(`API call failed: ${response.message}`);
+		} else throw new Error(`HTTP ${_response.status}`);
+	}
+
 	private buildRequest(method: string, params: string): string {
 		return buildRequest(
 			`${this.host}/api/${method}`,
